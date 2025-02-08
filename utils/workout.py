@@ -1,14 +1,7 @@
 import streamlit as st
-import pandas as pd
-import os
+from models import get_db, Workout
 from datetime import datetime
-
-def init_workouts():
-    if not os.path.exists('data'):
-        os.makedirs('data')
-    if not os.path.exists('data/workouts.csv'):
-        df = pd.DataFrame(columns=['username', 'date', 'exercise', 'sets', 'reps', 'weight', 'exp_gained'])
-        df.to_csv('data/workouts.csv', index=False)
+import pandas as pd
 
 EXERCISE_IMAGES = {
     "Bench Press": "https://images.unsplash.com/photo-1616994051378-8e3a64147f56",
@@ -21,27 +14,47 @@ EXERCISE_IMAGES = {
     "Planks": "https://images.unsplash.com/photo-1517130038641-a774d04afb3c"
 }
 
-def log_workout(username, exercise, sets, reps, weight):
-    workouts = pd.read_csv('data/workouts.csv')
-    exp_gained = calculate_exp(sets, reps, weight)
-    
-    new_workout = pd.DataFrame({
-        'username': [username],
-        'date': [datetime.now().strftime('%Y-%m-%d')],
-        'exercise': [exercise],
-        'sets': [sets],
-        'reps': [reps],
-        'weight': [weight],
-        'exp_gained': [exp_gained]
-    })
-    
-    workouts = pd.concat([workouts, new_workout], ignore_index=True)
-    workouts.to_csv('data/workouts.csv', index=False)
-    return exp_gained
+def init_workouts():
+    pass
 
-def calculate_exp(sets, reps, weight):
+def log_workout(username: str, exercise: str, sets: int, reps: int, weight: float) -> int:
+    db = next(get_db())
+    try:
+        exp_gained = calculate_exp(sets, reps, weight)
+        new_workout = Workout(
+            user_id=st.session_state['user_id'],
+            exercise=exercise,
+            sets=sets,
+            reps=reps,
+            weight=weight,
+            exp_gained=exp_gained
+        )
+        db.add(new_workout)
+        db.commit()
+        return exp_gained
+    finally:
+        db.close()
+
+def calculate_exp(sets: int, reps: int, weight: float) -> int:
     return int((sets * reps * weight) / 10)
 
-def get_user_workouts(username):
-    workouts = pd.read_csv('data/workouts.csv')
-    return workouts[workouts['username'] == username]
+def get_user_workouts(username: str) -> pd.DataFrame:
+    db = next(get_db())
+    try:
+        workouts = db.query(Workout).filter(
+            Workout.user_id == st.session_state['user_id']
+        ).all()
+
+        if not workouts:
+            return pd.DataFrame()
+
+        return pd.DataFrame([{
+            'date': w.date,
+            'exercise': w.exercise,
+            'sets': w.sets,
+            'reps': w.reps,
+            'weight': w.weight,
+            'exp_gained': w.exp_gained
+        } for w in workouts])
+    finally:
+        db.close()

@@ -1,42 +1,48 @@
 import streamlit as st
-import pandas as pd
-import os
-from pathlib import Path
+from models import get_db, User
+from sqlalchemy.orm import Session
 
 def init_users():
-    if not os.path.exists('data'):
-        os.makedirs('data')
-    if not os.path.exists('data/users.csv'):
-        df = pd.DataFrame(columns=['username', 'password', 'character_class', 'level', 'exp'])
-        df.to_csv('data/users.csv', index=False)
+    # Database tables are automatically created by SQLAlchemy
+    pass
 
-def login_user(username, password):
-    users = pd.read_csv('data/users.csv')
-    user = users[users['username'] == username]
-    if not user.empty and user.iloc[0]['password'] == password:
-        st.session_state['logged_in'] = True
-        st.session_state['username'] = username
-        st.session_state['character_class'] = user.iloc[0]['character_class']
-        st.session_state['level'] = user.iloc[0]['level']
-        st.session_state['exp'] = user.iloc[0]['exp']
-        return True
-    return False
-
-def register_user(username, password, character_class):
-    users = pd.read_csv('data/users.csv')
-    if username in users['username'].values:
+def login_user(username: str, password: str) -> bool:
+    db = next(get_db())
+    try:
+        user = db.query(User).filter(User.username == username).first()
+        if user and user.password == password:  # In production, use proper password hashing
+            st.session_state['logged_in'] = True
+            st.session_state['user_id'] = user.id
+            st.session_state['username'] = username
+            st.session_state['character_class'] = user.character_class
+            st.session_state['level'] = user.level
+            st.session_state['exp'] = user.exp
+            return True
         return False
-    
-    new_user = pd.DataFrame({
-        'username': [username],
-        'password': [password],
-        'character_class': [character_class],
-        'level': [1],
-        'exp': [0]
-    })
-    users = pd.concat([users, new_user], ignore_index=True)
-    users.to_csv('data/users.csv', index=False)
-    return True
+    finally:
+        db.close()
+
+def register_user(username: str, password: str, character_class: str) -> bool:
+    db = next(get_db())
+    try:
+        if db.query(User).filter(User.username == username).first():
+            return False
+
+        new_user = User(
+            username=username,
+            password=password,  # In production, use proper password hashing
+            character_class=character_class,
+            level=1,
+            exp=0
+        )
+        db.add(new_user)
+        db.commit()
+        return True
+    except:
+        db.rollback()
+        return False
+    finally:
+        db.close()
 
 def logout_user():
     for key in st.session_state.keys():
