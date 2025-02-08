@@ -3,15 +3,28 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 import os
 from datetime import datetime
+import logging
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Get database URL from environment
 DATABASE_URL = os.getenv('DATABASE_URL')
+if DATABASE_URL is None:
+    raise ValueError("DATABASE_URL environment variable is not set")
 if DATABASE_URL.startswith('postgres://'):
     DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
 
 # Create engine and session
-engine = create_engine(DATABASE_URL)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+try:
+    engine = create_engine(DATABASE_URL)
+    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    logger.info("Successfully connected to database")
+except Exception as e:
+    logger.error(f"Failed to connect to database: {str(e)}")
+    raise
+
 Base = declarative_base()
 
 class User(Base):
@@ -67,4 +80,9 @@ def get_db():
         db.close()
 
 # Create all tables
-Base.metadata.create_all(bind=engine)
+try:
+    Base.metadata.create_all(bind=engine)
+    logger.info("Successfully created database tables")
+except Exception as e:
+    logger.error(f"Failed to create database tables: {str(e)}")
+    raise
