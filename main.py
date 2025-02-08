@@ -3,7 +3,7 @@ import pandas as pd
 import plotly.express as px
 from utils.auth import init_users, login_user, register_user, logout_user
 from utils.character import CHARACTER_CLASSES, update_character_exp
-from utils.workout import init_workouts, EXERCISE_IMAGES, log_workout, get_user_workouts
+from utils.workout import init_workouts, EXERCISE_IMAGES, log_workout, get_workouts #get_user_workouts
 from utils.achievements import ACHIEVEMENTS, check_achievements
 import logging
 
@@ -111,7 +111,7 @@ def main():
 
         with tab2:
             st.header("Progress Tracking")
-            user_workouts = get_user_workouts(st.session_state['username'])
+            user_workouts = get_workouts(st.session_state['username'])
 
             if not user_workouts.empty:
                 # Exercise distribution

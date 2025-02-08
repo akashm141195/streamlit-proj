@@ -1,5 +1,5 @@
 import pandas as pd
-from models import get_db, User, Workout
+from models import get_user, get_user_workouts
 from datetime import datetime
 import logging
 
@@ -41,43 +41,41 @@ ACHIEVEMENTS = {
 }
 
 def check_achievements(username):
-    db = next(get_db())
     try:
-        # Get user and their workouts from database
-        user = db.query(User).filter(User.username == username).first()
-        if not user:
+        user = get_user(username)
+        if user is None:
             logger.warning(f"User {username} not found")
             return []
 
-        workouts = db.query(Workout).filter(Workout.user_id == user.id).all()
+        workouts = get_user_workouts(username)
         achieved = []
 
         # Check each achievement condition
-        if workouts:
+        if not workouts.empty:
             achieved.append("Novice Lifter")
 
         if len(workouts) >= 50:
             achieved.append("Workout Warrior")
 
-        if user.level >= 10:
+        if user['level'] >= 10:
             achieved.append("Level Master")
 
         # Check for weight achievement
-        if any(workout.weight >= 200 for workout in workouts):
+        if not workouts.empty and (workouts['weight'] >= 200).any():
             achieved.append("Weight Master")
 
         # Check for endurance achievement
-        if any((workout.sets * workout.reps) >= 100 for workout in workouts):
+        if not workouts.empty and ((workouts['sets'] * workouts['reps']) >= 100).any():
             achieved.append("Endurance Champion")
 
         # Check for consecutive days
-        if workouts:
-            dates = sorted([workout.date for workout in workouts])
+        if not workouts.empty:
+            dates = sorted(workouts['date'].unique())
             max_consecutive = 1
             current_consecutive = 1
 
             for i in range(1, len(dates)):
-                if (dates[i] - dates[i-1]).days == 1:
+                if pd.to_datetime(dates[i]) - pd.to_datetime(dates[i-1]) == pd.Timedelta(days=1):
                     current_consecutive += 1
                     max_consecutive = max(max_consecutive, current_consecutive)
                 else:
@@ -92,5 +90,3 @@ def check_achievements(username):
     except Exception as e:
         logger.error(f"Error checking achievements: {str(e)}")
         return []
-    finally:
-        db.close()

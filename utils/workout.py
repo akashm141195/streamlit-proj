@@ -1,5 +1,5 @@
 import streamlit as st
-from models import get_db, Workout
+from models import add_workout, get_user_workouts
 from datetime import datetime
 import logging
 
@@ -22,57 +22,26 @@ def init_workouts():
     pass
 
 def log_workout(username: str, exercise: str, sets: int, reps: int, weight: float) -> int:
-    db = next(get_db())
     try:
         exp_gained = calculate_exp(sets, reps, weight)
-        new_workout = Workout(
-            user_id=st.session_state['user_id'],
-            exercise=exercise,
-            sets=sets,
-            reps=reps,
-            weight=weight,
-            exp_gained=exp_gained
-        )
-        db.add(new_workout)
-        db.commit()
+        add_workout(username, exercise, sets, reps, weight, exp_gained)
         logger.info(f"Logged workout for user {username}: {exercise}, {sets}x{reps} at {weight}lbs")
         return exp_gained
     except Exception as e:
         logger.error(f"Error logging workout: {str(e)}")
-        db.rollback()
         raise
-    finally:
-        db.close()
 
 def calculate_exp(sets: int, reps: int, weight: float) -> int:
     return int((sets * reps * weight) / 10)
 
-def get_user_workouts(username: str) -> list:
-    db = next(get_db())
+def get_workouts(username: str):
     try:
-        workouts = db.query(Workout).filter(
-            Workout.user_id == st.session_state['user_id']
-        ).all()
-
-        if not workouts:
+        workouts = get_user_workouts(username)
+        if workouts.empty: # Assuming get_user_workouts returns an object with an empty property
             logger.info(f"No workouts found for user {username}")
             return []
-
-        workout_list = []
-        for w in workouts:
-            workout_list.append({
-                'date': w.date,
-                'exercise': w.exercise,
-                'sets': w.sets,
-                'reps': w.reps,
-                'weight': w.weight,
-                'exp_gained': w.exp_gained
-            })
-
-        logger.info(f"Retrieved {len(workout_list)} workouts for user {username}")
-        return workout_list
+        logger.info(f"Retrieved {len(workouts)} workouts for user {username}")
+        return workouts
     except Exception as e:
         logger.error(f"Error retrieving workouts: {str(e)}")
         return []
-    finally:
-        db.close()

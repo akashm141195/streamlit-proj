@@ -1,5 +1,5 @@
 import streamlit as st
-from models import get_db, User
+from models import update_user_exp
 import logging
 
 # Set up logging
@@ -29,24 +29,12 @@ def calculate_level(exp):
     return 1 + (exp // 1000)
 
 def update_character_exp(username, exp_gain):
-    db = next(get_db())
     try:
-        user = db.query(User).filter(User.username == username).first()
-        if not user:
-            logger.error(f"User {username} not found")
-            return
-
-        new_exp = user.exp + exp_gain
-        user.exp = new_exp
-        user.level = calculate_level(new_exp)
-        db.commit()
+        new_exp, new_level = update_user_exp(username, exp_gain)
 
         # Update session state
         st.session_state['exp'] = new_exp
-        st.session_state['level'] = calculate_level(new_exp)
-        logger.info(f"Updated experience for user {username}: +{exp_gain} EXP, Level {user.level}")
+        st.session_state['level'] = new_level
+        logger.info(f"Updated experience for user {username}: +{exp_gain} EXP, Level {new_level}")
     except Exception as e:
         logger.error(f"Error updating character experience: {str(e)}")
-        db.rollback()
-    finally:
-        db.close()
