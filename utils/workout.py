@@ -1,7 +1,11 @@
 import streamlit as st
 from models import get_db, Workout
 from datetime import datetime
-import pandas as pd
+import logging
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 EXERCISE_IMAGES = {
     "Bench Press": "https://images.unsplash.com/photo-1616994051378-8e3a64147f56",
@@ -31,14 +35,19 @@ def log_workout(username: str, exercise: str, sets: int, reps: int, weight: floa
         )
         db.add(new_workout)
         db.commit()
+        logger.info(f"Logged workout for user {username}: {exercise}, {sets}x{reps} at {weight}lbs")
         return exp_gained
+    except Exception as e:
+        logger.error(f"Error logging workout: {str(e)}")
+        db.rollback()
+        raise
     finally:
         db.close()
 
 def calculate_exp(sets: int, reps: int, weight: float) -> int:
     return int((sets * reps * weight) / 10)
 
-def get_user_workouts(username: str) -> pd.DataFrame:
+def get_user_workouts(username: str) -> list:
     db = next(get_db())
     try:
         workouts = db.query(Workout).filter(
@@ -46,15 +55,24 @@ def get_user_workouts(username: str) -> pd.DataFrame:
         ).all()
 
         if not workouts:
-            return pd.DataFrame()
+            logger.info(f"No workouts found for user {username}")
+            return []
 
-        return pd.DataFrame([{
-            'date': w.date,
-            'exercise': w.exercise,
-            'sets': w.sets,
-            'reps': w.reps,
-            'weight': w.weight,
-            'exp_gained': w.exp_gained
-        } for w in workouts])
+        workout_list = []
+        for w in workouts:
+            workout_list.append({
+                'date': w.date,
+                'exercise': w.exercise,
+                'sets': w.sets,
+                'reps': w.reps,
+                'weight': w.weight,
+                'exp_gained': w.exp_gained
+            })
+
+        logger.info(f"Retrieved {len(workout_list)} workouts for user {username}")
+        return workout_list
+    except Exception as e:
+        logger.error(f"Error retrieving workouts: {str(e)}")
+        return []
     finally:
         db.close()

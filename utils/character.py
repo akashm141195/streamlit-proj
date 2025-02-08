@@ -1,5 +1,10 @@
 import streamlit as st
-import pandas as pd
+from models import get_db, User
+import logging
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 CHARACTER_CLASSES = {
     "Warrior": {
@@ -24,12 +29,24 @@ def calculate_level(exp):
     return 1 + (exp // 1000)
 
 def update_character_exp(username, exp_gain):
-    users = pd.read_csv('data/users.csv')
-    user_idx = users[users['username'] == username].index[0]
-    current_exp = users.loc[user_idx, 'exp']
-    new_exp = current_exp + exp_gain
-    users.loc[user_idx, 'exp'] = new_exp
-    users.loc[user_idx, 'level'] = calculate_level(new_exp)
-    users.to_csv('data/users.csv', index=False)
-    st.session_state['exp'] = new_exp
-    st.session_state['level'] = calculate_level(new_exp)
+    db = next(get_db())
+    try:
+        user = db.query(User).filter(User.username == username).first()
+        if not user:
+            logger.error(f"User {username} not found")
+            return
+
+        new_exp = user.exp + exp_gain
+        user.exp = new_exp
+        user.level = calculate_level(new_exp)
+        db.commit()
+
+        # Update session state
+        st.session_state['exp'] = new_exp
+        st.session_state['level'] = calculate_level(new_exp)
+        logger.info(f"Updated experience for user {username}: +{exp_gain} EXP, Level {user.level}")
+    except Exception as e:
+        logger.error(f"Error updating character experience: {str(e)}")
+        db.rollback()
+    finally:
+        db.close()
