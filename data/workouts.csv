@@ -1,0 +1,9 @@
+username,date,exercise,sets,reps,weight,exp_gained
+demo_user,2024-01-01,Bench Press,3,10,135,405
+demo_user,2024-01-02,Squats,4,8,185,592
+demo_user,2024-01-03,Deadlift,3,5,225,338
+demo_user,2024-01-04,Pull-ups,3,12,0,36
+demo_user,2024-01-05,Push-ups,4,15,0,60
+demo_user,2024-01-06,Running,1,1,0,10
+demo_user,2024-01-07,Rowing,3,10,50,150
+demo_user,2024-01-08,Planks,3,1,0,9
